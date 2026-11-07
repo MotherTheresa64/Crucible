@@ -3,10 +3,23 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "A tiny expression language: lexer, precedence-climbing parser and evaluator with positioned errors.",
-  "engines": { "node": ">=24" },
-  "scripts": {
-    "test": "node --test"
+  "description": "A small expression language with a hand-written lexer, precedence-climbing parser and no eval, plus a browser demo.",
+  "engines": {
+    "node": ">=24"
   },
-  "license": "MIT"
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/server.ts"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MotherTheresa64/crucible.git"
+  },
+  "homepage": "https://github.com/MotherTheresa64/crucible#readme",
+  "keywords": [
+    "nodejs",
+    "typescript",
+    "zero-dependencies"
+  ]
 }
