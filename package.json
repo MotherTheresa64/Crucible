@@ -1,0 +1,12 @@
+{
+  "name": "@noah/crucible",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A tiny expression language: lexer, precedence-climbing parser and evaluator with positioned errors.",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT"
+}
