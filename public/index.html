@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:," />
+<title>Crucible — expression language</title>
+<style>
+  :root{--ink:#14181d;--muted:#5b6670;--line:#e2e6ea;--bg:#f6f7f9;--card:#fff;--accent:#2f5bea;--ok:#177245;--bad:#b3261e}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:16px;letter-spacing:-.01em}
+  h1 span{display:block;font-size:12.5px;font-weight:400;color:var(--muted)}
+  main{max-width:880px;margin:0 auto;padding:18px 20px 40px;display:grid;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  label{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+  textarea,input[type="text"]{width:100%;padding:10px 12px;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid var(--line);border-radius:8px;background:#fff;color:inherit}
+  textarea{min-height:70px;resize:vertical}
+  button{font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
+  button.secondary{background:#fff;color:var(--ink);border-color:var(--line)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .out{font:14px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word;margin:0}
+  .ok{color:var(--ok);font-weight:700}
+  .bad{color:var(--bad);font-weight:700}
+  .muted{color:var(--muted)}
+  .tokens{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:24px}
+  .tok{font:12.5px/1.4 ui-monospace,monospace;background:#eef1f4;border-radius:6px;padding:3px 8px}
+  .tok b{color:var(--accent)}
+  .hint{color:var(--muted);font-size:12.5px;margin:10px 0 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Crucible<span>a hand-written lexer, parser and evaluator — no eval()</span></h1>
+</header>
+<main>
+  <section class="card">
+    <label for="source">Expression</label>
+    <textarea id="source">2 + 3 * 4</textarea>
+    <div class="row">
+      <button id="run" type="button">Evaluate</button>
+      <button id="sample" class="secondary" type="button">Try another</button>
+    </div>
+    <p class="hint">Operators: <b>+ - * / % **</b>, comparisons, <b>&amp;&amp; || !</b>. Builtins: min, max, abs, round, floor, ceil, len, upper, lower.</p>
+    <label for="env" style="margin-top:14px">Context (JSON)</label>
+    <textarea id="env">{ "total": 150, "vip": true }</textarea>
+  </section>
+  <section class="card">
+    <label>Result</label>
+    <div id="result" class="out muted">Press Evaluate.</div>
+    <label style="margin-top:16px">Tokens</label>
+    <div id="tokens" class="tokens"></div>
+  </section>
+</main>
+<script>
+  const $ = (selector) => document.querySelector(selector);
+  const samples = ["2 + 3 * 4", "(2 + 3) * 4", "round(2.567, 2)", "max(3, 9, 2) - 1", "total > 100 && vip", "len(upper('buffy'))", "1 + * 2"];
+  let sampleIndex = 0;
+
+  async function post(path, body) {
+    const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    return { status: res.status, data: await res.json().catch(() => ({})) };
+  }
+
+  function line(text, className) {
+    const node = document.createElement("div");
+    node.className = className;
+    node.textContent = text;
+    return node;
+  }
+
+  async function evaluate() {
+    const source = $("#source").value;
+    let env = {};
+    try {
+      env = JSON.parse($("#env").value || "{}");
+    } catch {
+      $("#result").textContent = "Context is not valid JSON.";
+      return;
+    }
+
+    const [evaluation, tokens] = await Promise.all([
+      post("/evaluate", { source, env }),
+      post("/tokens", { source }),
+    ]);
+
+    const result = $("#result");
+    result.replaceChildren();
+    result.className = "out";
+
+    if (evaluation.data.ok) {
+      result.append(line("= " + JSON.stringify(evaluation.data.value), "ok"));
+    } else {
+      const error = evaluation.data.error ?? {};
+      if (typeof error.position === "number") {
+        result.append(line(source, "muted"));
+        result.append(line(" ".repeat(error.position) + "^", "muted"));
+        result.append(line((error.message ?? "evaluation failed") + " (position " + error.position + ")", "bad"));
+      } else {
+        result.append(line(error.message ?? "evaluation failed", "bad"));
+      }
+    }
+
+    const box = $("#tokens");
+    box.replaceChildren();
+    const list = tokens.data.tokens ?? [];
+    if (!list.length) {
+      box.append(line(tokens.data.error?.message ?? "no tokens", "muted"));
+      return;
+    }
+    for (const token of list) {
+      const chip = document.createElement("span");
+      chip.className = "tok";
+      const type = document.createElement("b");
+      type.textContent = token.type;
+      chip.append(type, ": " + token.value);
+      box.append(chip);
+    }
+  }
+
+  $("#run").addEventListener("click", evaluate);
+  $("#sample").addEventListener("click", () => {
+    sampleIndex = (sampleIndex + 1) % samples.length;
+    $("#source").value = samples[sampleIndex];
+    evaluate();
+  });
+  evaluate();
+</script>
+</body>
+</html>
